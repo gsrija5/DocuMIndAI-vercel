@@ -1,0 +1,5 @@
+fastapi
+google-genai
+PyMuPDF
+python-multipart
+numpy
