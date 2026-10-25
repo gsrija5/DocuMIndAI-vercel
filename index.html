@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DocuMind AI | Your Document Assistant</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: Arial, sans-serif; color: #182033;
+      background: linear-gradient(135deg, #f2f5ff, #f8faff);
+      min-height: 100vh;
+    }
+    header {
+      background: #fff; padding: 20px 7%; display: flex;
+      align-items: center; justify-content: space-between;
+      border-bottom: 1px solid #e7eaf2;
+    }
+    .brand { font-size: 24px; font-weight: 800; color: #4f46e5; }
+    .tag { color: #64748b; font-size: 13px; }
+    main { max-width: 850px; margin: 48px auto; padding: 0 18px; }
+    .hero { text-align: center; margin-bottom: 32px; }
+    .hero h1 { font-size: clamp(30px, 5vw, 44px); margin-bottom: 12px; }
+    .hero p { color: #64748b; line-height: 1.6; }
+    .card {
+      background: white; padding: 26px; border-radius: 18px;
+      box-shadow: 0 12px 35px #1e293b0c; margin-bottom: 20px;
+      border: 1px solid #e7eaf2;
+    }
+    .upload {
+      display: block; padding: 28px; text-align: center;
+      border: 2px dashed #c7c9f9; background: #fafaff;
+      border-radius: 14px; cursor: pointer; line-height: 1.8;
+    }
+    input[type=file] { max-width: 100%; margin-top: 12px; }
+    label { display: block; font-weight: 700; margin: 22px 0 9px; }
+    input[type=text] {
+      width: 100%; padding: 14px; border: 1px solid #d8deea;
+      border-radius: 10px; font-size: 16px;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+    button {
+      border: 0; padding: 13px 18px; border-radius: 10px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      background: #4f46e5; color: white;
+    }
+    button.secondary { background: #e9eaff; color: #3730a3; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #status { color: #475569; margin-top: 18px; line-height: 1.5; }
+    #result {
+      white-space: pre-wrap; line-height: 1.75; overflow-wrap: anywhere;
+      color: #293247;
+    }
+    .hidden { display: none; }
+    footer { text-align: center; padding: 25px; color: #64748b; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">✦ DocuMind AI</div>
+    <div class="tag">Your intelligent document assistant</div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Understand documents <span style="color:#4f46e5">smarter.</span></h1>
+      <p>Upload a PDF, get a clear summary, and ask questions about its contents.</p>
+    </section>
+
+    <section class="card">
+      <label class="upload" for="pdf">
+        <strong>📄 Choose your PDF document</strong><br>
+        Select a text-based PDF to get started.
+        <input id="pdf" type="file" accept=".pdf,application/pdf">
+      </label>
+
+      <div id="fileInfo" style="margin-top:12px;color:#64748b">No PDF selected yet.</div>
+
+      <label for="question">Ask a question about your document</label>
+      <input id="question" type="text" placeholder="e.g. What are the main findings?">
+
+      <div class="actions">
+        <button id="summarize">✨ Summarize PDF</button>
+        <button id="ask" class="secondary">💬 Ask question</button>
+      </div>
+      <div id="status" role="status"></div>
+    </section>
+
+    <section id="outputCard" class="card hidden">
+      <h2 id="resultTitle">Result</h2>
+      <div id="result"></div>
+    </section>
+  </main>
+
+  <footer>DocuMind AI · Powered by Gemini</footer>
+
+  <script>
+    const API = "/api";
+    const pdfInput = document.getElementById("pdf");
+    const fileInfo = document.getElementById("fileInfo");
+    const statusBox = document.getElementById("status");
+    const resultBox = document.getElementById("result");
+    const outputCard = document.getElementById("outputCard");
+    const resultTitle = document.getElementById("resultTitle");
+    const summarizeButton = document.getElementById("summarize");
+    const askButton = document.getElementById("ask");
+
+    pdfInput.addEventListener("change", () => {
+      const file = pdfInput.files[0];
+      fileInfo.textContent = file
+        ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`
+        : "No PDF selected yet.";
+    });
+
+    async function run(action) {
+      const file = pdfInput.files[0];
+
+      if (!file) {
+        statusBox.textContent = "Please choose a PDF first.";
+        return;
+      }
+
+      if (file.size > 4 * 1024 * 1024) {
+        statusBox.textContent = "Please choose a PDF smaller than 4 MB.";
+        return;
+      }
+
+      const question = document.getElementById("question").value.trim();
+
+      if (action === "ask" && !question) {
+        statusBox.textContent = "Please type your question first.";
+        return;
+      }
+
+      summarizeButton.disabled = true;
+      askButton.disabled = true;
+      statusBox.textContent = "Processing your document. This may take a little time...";
+      outputCard.classList.add("hidden");
+
+      const form = new FormData();
+      form.append("file", file);
+
+      if (action === "ask") form.append("question", question);
+
+      try {
+        const response = await fetch(`${API}/${action}`, {
+          method: "POST",
+          body: form
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.detail || "The request could not be completed.");
+        }
+
+        resultTitle.textContent = action === "summarize"
+          ? "Document Summary"
+          : "Answer to Your Question";
+
+        resultBox.textContent = action === "summarize"
+          ? data.summary
+          : data.answer;
+
+        outputCard.classList.remove("hidden");
+        statusBox.textContent =
+          `Completed · ${data.pages} page(s) · ${data.filename}`;
+      } catch (error) {
+        statusBox.textContent = `Sorry, something went wrong: ${error.message}`;
+      } finally {
+        summarizeButton.disabled = false;
+        askButton.disabled = false;
+      }
+    }
+
+    summarizeButton.addEventListener("click", () => run("summarize"));
+    askButton.addEventListener("click", () => run("ask"));
+  </script>
+</body>
+</html>
