@@ -36,7 +36,7 @@ if api_key:
         http_options=types.HttpOptions(timeout=120000),
     )
 
-GENERATION_MODEL = "gemini-2.5-flash"
+GENERATION_MODEL = "gemini-3.8-flash"
 EMBEDDING_MODEL = "gemini-embedding-001"
 
 
