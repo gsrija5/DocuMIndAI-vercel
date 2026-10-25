@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from google.genai import types
 
+
 # --------------------------------------------------
 # 1. Initialize FastAPI
 # --------------------------------------------------
@@ -16,11 +17,12 @@ app = FastAPI(title="DocuMind AI API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict this to your frontend domain later
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # --------------------------------------------------
 # 2. Configure Gemini
@@ -37,6 +39,7 @@ if api_key:
     )
 
 GENERATION_MODEL = "gemini-3.8-flash"
+FALLBACK_MODEL = "gemini-3.5-flash-lite"
 EMBEDDING_MODEL = "gemini-embedding-001"
 
 
@@ -68,7 +71,6 @@ async def extract_pdf_text(file: UploadFile):
             detail="The uploaded PDF is empty.",
         )
 
-    # Basic protection against unnecessarily large uploads
     if len(pdf_bytes) > 4 * 1024 * 1024:
         raise HTTPException(
             status_code=413,
@@ -155,8 +157,15 @@ def call_with_retries(function, max_attempts=3):
                 ) from error
 
             retryable = any(marker in message for marker in [
-                "503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED",
-                "500", "502", "504", "INTERNAL", "TIMEOUT",
+                "503",
+                "UNAVAILABLE",
+                "429",
+                "RESOURCE_EXHAUSTED",
+                "500",
+                "502",
+                "504",
+                "INTERNAL",
+                "TIMEOUT",
             ])
 
             if not retryable or attempt == max_attempts - 1:
@@ -166,7 +175,44 @@ def call_with_retries(function, max_attempts=3):
 
 
 # --------------------------------------------------
-# 6. Create embeddings and find relevant chunks
+# 6. Generate content with a fallback model
+# --------------------------------------------------
+
+def generate_with_fallback(prompt):
+    gemini = get_client()
+    models_to_try = [GENERATION_MODEL, FALLBACK_MODEL]
+    last_error = None
+
+    for model in models_to_try:
+        try:
+            return call_with_retries(
+                lambda model=model: gemini.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                ),
+                max_attempts=2,
+            )
+
+        except HTTPException as error:
+            if error.status_code == 429:
+                raise
+            last_error = error
+
+        except Exception as error:
+            last_error = error
+
+    raise HTTPException(
+        status_code=502,
+        detail=(
+            "Gemini models are temporarily unavailable or unsupported. "
+            "Please try again shortly. "
+            f"{str(last_error)[:180]}"
+        ),
+    )
+
+
+# --------------------------------------------------
+# 7. Create embeddings
 # --------------------------------------------------
 
 def create_embeddings(texts):
@@ -200,6 +246,10 @@ def create_embeddings(texts):
     return vectors
 
 
+# --------------------------------------------------
+# 8. Calculate cosine similarity
+# --------------------------------------------------
+
 def cosine_similarity(vector_a, vector_b):
     dot = sum(a * b for a, b in zip(vector_a, vector_b))
 
@@ -211,6 +261,10 @@ def cosine_similarity(vector_a, vector_b):
 
     return dot / (magnitude_a * magnitude_b)
 
+
+# --------------------------------------------------
+# 9. Retrieve relevant chunks
+# --------------------------------------------------
 
 def retrieve_relevant_chunks(question, chunks, vectors, top_k=3):
     gemini = get_client()
@@ -238,11 +292,14 @@ def retrieve_relevant_chunks(question, chunks, vectors, top_k=3):
 
     scored_chunks.sort(key=lambda item: item[0], reverse=True)
 
-    return [chunk for _, chunk in scored_chunks[:top_k]]
+    return [
+        chunk
+        for _, chunk in scored_chunks[:top_k]
+    ]
 
 
 # --------------------------------------------------
-# 7. Health check
+# 10. Health check
 # --------------------------------------------------
 
 @app.get("/api/health")
@@ -255,15 +312,13 @@ def health():
 
 
 # --------------------------------------------------
-# 8. Summarize a PDF
+# 11. Summarize a PDF
 # --------------------------------------------------
 
 @app.post("/api/summarize")
 async def summarize_pdf(file: UploadFile = File(...)):
     text, page_count = await extract_pdf_text(file)
-    gemini = get_client()
 
-    # Limit input size for this initial prototype
     document_text = text[:60000]
 
     prompt = f"""
@@ -284,12 +339,7 @@ DOCUMENT:
 """
 
     try:
-        response = call_with_retries(
-            lambda: gemini.models.generate_content(
-                model=GENERATION_MODEL,
-                contents=prompt,
-            )
-        )
+        response = generate_with_fallback(prompt)
 
         return {
             "filename": file.filename,
@@ -308,7 +358,7 @@ DOCUMENT:
 
 
 # --------------------------------------------------
-# 9. Ask a question about a PDF
+# 12. Ask a question about a PDF
 # --------------------------------------------------
 
 @app.post("/api/ask")
@@ -331,10 +381,8 @@ async def ask_question(
             detail="No text is available to answer questions.",
         )
 
-    gemini = get_client()
-
     try:
-        # Keep the first prototype within reasonable processing limits
+        # Keep this prototype within reasonable processing limits.
         chunks = chunks[:100]
         vectors = create_embeddings(chunks)
 
@@ -366,12 +414,7 @@ USER QUESTION:
 {question}
 """
 
-        response = call_with_retries(
-            lambda: gemini.models.generate_content(
-                model=GENERATION_MODEL,
-                contents=prompt,
-            )
-        )
+        response = generate_with_fallback(prompt)
 
         return {
             "filename": file.filename,
