@@ -6,53 +6,187 @@
   <title>DocuMind AI | Your Document Assistant</title>
   <style>
     * { box-sizing: border-box; }
+
     body {
-      margin: 0; font-family: Arial, sans-serif; color: #182033;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      color: #182033;
       background: linear-gradient(135deg, #f2f5ff, #f8faff);
       min-height: 100vh;
     }
+
     header {
-      background: #fff; padding: 20px 7%; display: flex;
-      align-items: center; justify-content: space-between;
+      background: #fff;
+      padding: 20px 7%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
       border-bottom: 1px solid #e7eaf2;
     }
-    .brand { font-size: 24px; font-weight: 800; color: #4f46e5; }
+
+    .brand {
+      font-size: 24px;
+      font-weight: 800;
+      color: #4f46e5;
+    }
+
     .tag { color: #64748b; font-size: 13px; }
-    main { max-width: 850px; margin: 48px auto; padding: 0 18px; }
+
+    main {
+      max-width: 850px;
+      margin: 48px auto;
+      padding: 0 18px;
+    }
+
     .hero { text-align: center; margin-bottom: 32px; }
-    .hero h1 { font-size: clamp(30px, 5vw, 44px); margin-bottom: 12px; }
+
+    .hero h1 {
+      font-size: clamp(30px, 5vw, 44px);
+      margin-bottom: 12px;
+    }
+
     .hero p { color: #64748b; line-height: 1.6; }
+
     .card {
-      background: white; padding: 26px; border-radius: 18px;
-      box-shadow: 0 12px 35px #1e293b0c; margin-bottom: 20px;
+      background: white;
+      padding: 26px;
+      border-radius: 18px;
+      box-shadow: 0 12px 35px #1e293b0c;
+      margin-bottom: 20px;
       border: 1px solid #e7eaf2;
     }
+
     .upload {
-      display: block; padding: 28px; text-align: center;
-      border: 2px dashed #c7c9f9; background: #fafaff;
-      border-radius: 14px; cursor: pointer; line-height: 1.8;
+      display: block;
+      padding: 28px;
+      text-align: center;
+      border: 2px dashed #c7c9f9;
+      background: #fafaff;
+      border-radius: 14px;
+      cursor: pointer;
+      line-height: 1.8;
     }
+
     input[type=file] { max-width: 100%; margin-top: 12px; }
-    label { display: block; font-weight: 700; margin: 22px 0 9px; }
+
+    label {
+      display: block;
+      font-weight: 700;
+      margin: 22px 0 9px;
+    }
+
     input[type=text] {
-      width: 100%; padding: 14px; border: 1px solid #d8deea;
-      border-radius: 10px; font-size: 16px;
+      width: 100%;
+      padding: 14px;
+      border: 1px solid #d8deea;
+      border-radius: 10px;
+      font-size: 16px;
     }
-    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
     button {
-      border: 0; padding: 13px 18px; border-radius: 10px;
-      font-size: 15px; font-weight: 700; cursor: pointer;
-      background: #4f46e5; color: white;
+      border: 0;
+      padding: 13px 18px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #4f46e5;
+      color: white;
     }
+
     button.secondary { background: #e9eaff; color: #3730a3; }
     button:disabled { opacity: .55; cursor: wait; }
+
     #status { color: #475569; margin-top: 18px; line-height: 1.5; }
+
     #result {
-      white-space: pre-wrap; line-height: 1.75; overflow-wrap: anywhere;
       color: #293247;
+      overflow-wrap: anywhere;
     }
+
+    .summary-text {
+      white-space: pre-wrap;
+      line-height: 1.8;
+    }
+
+    .summary-heading {
+      margin-top: 0;
+      margin-bottom: 12px;
+      color: #252c46;
+    }
+
+    .summary-intro {
+      color: #64748b;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .overall-summary {
+      background: #f8f8ff;
+      border: 1px solid #e4e5ff;
+      padding: 20px;
+      border-radius: 14px;
+      margin-bottom: 28px;
+    }
+
+    .page-summary {
+      border: 1px solid #e4e8f1;
+      border-radius: 12px;
+      margin: 12px 0;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .page-summary summary {
+      cursor: pointer;
+      padding: 16px;
+      font-weight: 700;
+      color: #3730a3;
+      background: #fafaff;
+    }
+
+    .page-summary summary:hover { background: #f0f0ff; }
+
+    .page-content {
+      padding: 16px;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .notice {
+      background: #fff8e7;
+      border: 1px solid #f2dfac;
+      color: #765516;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
     .hidden { display: none; }
-    footer { text-align: center; padding: 25px; color: #64748b; font-size: 13px; }
+
+    footer {
+      text-align: center;
+      padding: 25px;
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    @media (max-width: 600px) {
+      header { padding: 18px; align-items: flex-start; flex-direction: column; }
+      main { margin: 28px auto; }
+      .card { padding: 19px; }
+      .upload { padding: 20px 12px; }
+    }
   </style>
 </head>
 <body>
@@ -74,16 +208,23 @@
         <input id="pdf" type="file" accept=".pdf,application/pdf">
       </label>
 
-      <div id="fileInfo" style="margin-top:12px;color:#64748b">No PDF selected yet.</div>
+      <div id="fileInfo" style="margin-top:12px;color:#64748b">
+        No PDF selected yet.
+      </div>
 
       <label for="question">Ask a question about your document</label>
-      <input id="question" type="text" placeholder="e.g. What are the main findings?">
+      <input
+        id="question"
+        type="text"
+        placeholder="e.g. What are the main findings?"
+      >
 
       <div class="actions">
         <button id="summarize">✨ Summarize PDF</button>
         <button id="ask" class="secondary">💬 Ask question</button>
       </div>
-      <div id="status" role="status"></div>
+
+      <div id="status" role="status" aria-live="polite"></div>
     </section>
 
     <section id="outputCard" class="card hidden">
@@ -96,6 +237,7 @@
 
   <script>
     const API = "/api";
+
     const pdfInput = document.getElementById("pdf");
     const fileInfo = document.getElementById("fileInfo");
     const statusBox = document.getElementById("status");
@@ -107,10 +249,126 @@
 
     pdfInput.addEventListener("change", () => {
       const file = pdfInput.files[0];
+
       fileInfo.textContent = file
         ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`
         : "No PDF selected yet.";
     });
+
+    function addTextElement(parent, tag, className, text) {
+      const element = document.createElement(tag);
+
+      if (className) element.className = className;
+
+      // Use textContent rather than HTML so document text is not
+      // interpreted as markup.
+      element.textContent = text || "";
+      parent.appendChild(element);
+
+      return element;
+    }
+
+    function renderSummary(data) {
+      resultBox.replaceChildren();
+
+      const intro = document.createElement("p");
+      intro.className = "summary-intro";
+      intro.textContent =
+        `${data.filename} · ${data.pages} page(s)`;
+      resultBox.appendChild(intro);
+
+      if (data.truncated) {
+        addTextElement(
+          resultBox,
+          "div",
+          "notice",
+          "This PDF exceeded the current text-processing limit. " +
+          "Some content may not be included in the summaries."
+        );
+      }
+
+      const overall = document.createElement("section");
+      overall.className = "overall-summary";
+
+      addTextElement(
+        overall,
+        "h3",
+        "summary-heading",
+        "📘 Overall Summary"
+      );
+
+      addTextElement(
+        overall,
+        "div",
+        "summary-text",
+        data.summary || "No overall summary was returned."
+      );
+
+      resultBox.appendChild(overall);
+
+      addTextElement(
+        resultBox,
+        "h3",
+        "summary-heading",
+        "📄 Page-wise Summaries"
+      );
+
+      addTextElement(
+        resultBox,
+        "p",
+        "summary-intro",
+        "Select a page below to expand or collapse its summary."
+      );
+
+      const pageSummaries = Array.isArray(data.page_summaries)
+        ? data.page_summaries
+        : [];
+
+      if (pageSummaries.length === 0) {
+        addTextElement(
+          resultBox,
+          "p",
+          "summary-text",
+          "Page-wise summaries were not returned. Please try again."
+        );
+        return;
+      }
+
+      pageSummaries.forEach((item, index) => {
+        const details = document.createElement("details");
+        details.className = "page-summary";
+
+        const heading = document.createElement("summary");
+        const pageNumber = Number(item.page) || index + 1;
+        heading.textContent = `Page ${pageNumber}`;
+        details.appendChild(heading);
+
+        addTextElement(
+          details,
+          "div",
+          "page-content",
+          item.summary || "No summary was returned for this page."
+        );
+
+        resultBox.appendChild(details);
+      });
+    }
+
+    function renderAnswer(data) {
+      resultBox.replaceChildren();
+
+      const intro = document.createElement("p");
+      intro.className = "summary-intro";
+      intro.textContent = `${data.filename} · ${data.pages} page(s)`;
+      resultBox.appendChild(intro);
+
+      addTextElement(
+        resultBox,
+        "div",
+        "summary-text",
+        data.answer || "No answer was returned."
+      );
+    }
 
     async function run(action) {
       const file = pdfInput.files[0];
@@ -121,7 +379,13 @@
       }
 
       if (file.size > 4 * 1024 * 1024) {
-        statusBox.textContent = "Please choose a PDF smaller than 4 MB.";
+        statusBox.textContent =
+          "Please choose a PDF smaller than 4 MB.";
+        return;
+      }
+
+      if (!file.name.toLowerCase().endsWith(".pdf")) {
+        statusBox.textContent = "Please choose a PDF file.";
         return;
       }
 
@@ -134,13 +398,16 @@
 
       summarizeButton.disabled = true;
       askButton.disabled = true;
-      statusBox.textContent = "Processing your document. This may take a little time...";
+      statusBox.textContent =
+        "Processing your document. This may take a little time...";
       outputCard.classList.add("hidden");
 
       const form = new FormData();
       form.append("file", file);
 
-      if (action === "ask") form.append("question", question);
+      if (action === "ask") {
+        form.append("question", question);
+      }
 
       try {
         const response = await fetch(`${API}/${action}`, {
@@ -148,25 +415,51 @@
           body: form
         });
 
-        const data = await response.json();
+        // Some hosting errors return HTML or plain text instead of JSON.
+        // Handle those responses without the "Unexpected token" error.
+        const responseText = await response.text();
+        let data;
+
+        try {
+          data = JSON.parse(responseText);
+        } catch {
+          const message = responseText
+            .replace(/<[^>]*>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 250);
+
+          throw new Error(
+            message ||
+            `The server returned an unexpected response (HTTP ${response.status}).`
+          );
+        }
 
         if (!response.ok) {
-          throw new Error(data.detail || "The request could not be completed.");
+          throw new Error(
+            data.detail ||
+            `The request could not be completed (HTTP ${response.status}).`
+          );
         }
 
         resultTitle.textContent = action === "summarize"
           ? "Document Summary"
           : "Answer to Your Question";
 
-        resultBox.textContent = action === "summarize"
-          ? data.summary
-          : data.answer;
+        if (action === "summarize") {
+          renderSummary(data);
+        } else {
+          renderAnswer(data);
+        }
 
         outputCard.classList.remove("hidden");
+
         statusBox.textContent =
           `Completed · ${data.pages} page(s) · ${data.filename}`;
+
       } catch (error) {
-        statusBox.textContent = `Sorry, something went wrong: ${error.message}`;
+        statusBox.textContent =
+          `Sorry, something went wrong: ${error.message}`;
       } finally {
         summarizeButton.disabled = false;
         askButton.disabled = false;
