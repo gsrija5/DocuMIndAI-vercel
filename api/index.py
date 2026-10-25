@@ -1,6 +1,8 @@
 import os
 import math
 import time
+import json
+import re
 
 import fitz
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
@@ -53,7 +55,7 @@ def get_client():
 
 
 # --------------------------------------------------
-# 3. Extract text from PDF
+# 3. Extract text from PDF, retaining each page
 # --------------------------------------------------
 
 async def extract_pdf_text(file: UploadFile):
@@ -113,7 +115,7 @@ async def extract_pdf_text(file: UploadFile):
             ),
         )
 
-    return text, len(pages)
+    return text, len(pages), pages
 
 
 # --------------------------------------------------
@@ -312,40 +314,196 @@ def health():
 
 
 # --------------------------------------------------
-# 11. Summarize a PDF
+# 11. Parse JSON returned by Gemini
+# --------------------------------------------------
+
+def parse_summary_json(response_text):
+    if not response_text:
+        raise HTTPException(
+            status_code=502,
+            detail="Gemini returned an empty summary.",
+        )
+
+    cleaned = response_text.strip()
+
+    # Handle responses wrapped in Markdown code fences.
+    cleaned = re.sub(
+        r"^```(?:json)?\s*|\s*```$",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    ).strip()
+
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError as error:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Gemini returned a summary in an unexpected format. "
+                "Please try again."
+            ),
+        ) from error
+
+    if not isinstance(data, dict) or not isinstance(
+        data.get("page_summaries"), list
+    ):
+        raise HTTPException(
+            status_code=502,
+            detail="Gemini returned incomplete page-wise summary data.",
+        )
+
+    return data
+
+
+# --------------------------------------------------
+# 12. Summarize a PDF: overall + page-wise
 # --------------------------------------------------
 
 @app.post("/api/summarize")
 async def summarize_pdf(file: UploadFile = File(...)):
-    text, page_count = await extract_pdf_text(file)
+    text, page_count, pages = await extract_pdf_text(file)
 
-    document_text = text[:60000]
+    # Limit the total text sent for summarization.
+    # Keep page numbers so the model can create individual summaries.
+    max_total_chars = 60000
+    remaining = max_total_chars
+    page_inputs = []
+    truncated = False
+
+    for index, page_text in enumerate(pages):
+        if not page_text:
+            page_inputs.append({
+                "page": index + 1,
+                "text": "[No selectable text found on this page.]",
+            })
+            continue
+
+        if remaining <= 0:
+            page_inputs.append({
+                "page": index + 1,
+                "text": "[Text omitted because the document exceeded the processing limit.]",
+            })
+            truncated = True
+            continue
+
+        page_part = page_text[:remaining]
+        page_inputs.append({
+            "page": index + 1,
+            "text": page_part,
+        })
+
+        remaining -= len(page_part)
+
+        if len(page_part) < len(page_text):
+            truncated = True
 
     prompt = f"""
 You are DocuMind AI, a helpful document assistant.
 
-Summarize the following document in clear, simple language.
+Analyze the supplied PDF text and return ONLY a valid JSON object.
+Do not use Markdown code fences.
 
-Include:
-1. Main idea
-2. Important points
-3. Key findings or conclusions
-4. Important terms, if any
+Use exactly this structure:
+{{
+  "summary": "Overall document summary in clear, simple language.",
+  "page_summaries": [
+    {{
+      "page": 1,
+      "summary": "A concise summary of page 1."
+    }}
+  ]
+}}
 
-Do not invent facts. If the provided text is incomplete, say so.
+Requirements:
+- The overall summary should cover the main idea, important points,
+  key findings or conclusions, and important terms where relevant.
+- Produce one page_summaries entry for EVERY page supplied below.
+- Keep the original page numbers exactly as provided.
+- Summarize each page using only the text for that page.
+- If a page has no selectable text or its text was omitted, state that
+  clearly in its page summary. Do not invent its contents.
+- Use simple, readable language.
+- Keep each page summary concise but useful.
+- Do not invent facts.
+- Escape quotation marks and special characters correctly so the
+  response is valid JSON.
 
-DOCUMENT:
-{document_text}
+DOCUMENT PAGES:
+{json.dumps(page_inputs, ensure_ascii=False)}
 """
 
     try:
         response = generate_with_fallback(prompt)
+        data = parse_summary_json(response.text or "")
+
+        raw_page_summaries = data["page_summaries"]
+        summary_by_page = {}
+
+        for item in raw_page_summaries:
+            if not isinstance(item, dict):
+                continue
+
+            try:
+                page_number = int(item.get("page"))
+            except (TypeError, ValueError):
+                continue
+
+            page_summary = item.get("summary")
+
+            if 1 <= page_number <= page_count and isinstance(
+                page_summary, str
+            ):
+                summary_by_page[page_number] = page_summary
+
+        # Always return a result for every original PDF page.
+        page_summaries = []
+
+        for index, page_text in enumerate(pages):
+            page_number = index + 1
+
+            if page_number in summary_by_page:
+                page_summary = summary_by_page[page_number]
+            elif not page_text:
+                page_summary = (
+                    "No selectable text was found on this page. "
+                    "It may contain images or scanned content."
+                )
+            elif page_number in {
+                item["page"]
+                for item in page_inputs
+                if item["text"].startswith(
+                    "[Text omitted because the document exceeded"
+                )
+            }:
+                page_summary = (
+                    "This page was not summarized because the document "
+                    "exceeded the text-processing limit."
+                )
+            else:
+                page_summary = (
+                    "A page summary was not returned. Please try again."
+                )
+
+            page_summaries.append({
+                "page": page_number,
+                "summary": page_summary,
+            })
+
+        overall_summary = data.get("summary")
+
+        if not isinstance(overall_summary, str) or not overall_summary.strip():
+            raise HTTPException(
+                status_code=502,
+                detail="Gemini did not return the overall summary.",
+            )
 
         return {
             "filename": file.filename,
             "pages": page_count,
-            "summary": response.text or "No summary was returned.",
-            "truncated": len(text) > 60000,
+            "summary": overall_summary,
+            "page_summaries": page_summaries,
+            "truncated": truncated,
         }
 
     except HTTPException:
@@ -358,7 +516,7 @@ DOCUMENT:
 
 
 # --------------------------------------------------
-# 12. Ask a question about a PDF
+# 13. Ask a question about a PDF
 # --------------------------------------------------
 
 @app.post("/api/ask")
@@ -372,7 +530,7 @@ async def ask_question(
             detail="Please enter a question.",
         )
 
-    text, page_count = await extract_pdf_text(file)
+    text, page_count, pages = await extract_pdf_text(file)
     chunks = split_into_chunks(text)
 
     if not chunks:
